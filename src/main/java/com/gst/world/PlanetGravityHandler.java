@@ -23,6 +23,13 @@ public final class PlanetGravityHandler {
     /** Vanilla'nın normal düşüş ivmesi (blok/tick^2), yaklaşık değer. */
     private static final double VANILLA_GRAVITY = 0.08;
 
+    /**
+     * Vanilla'nın havadayken her tick uyguladığı yatay sürtünme (drag) katsayısı:
+     * LivingEntity#travel içinde v.x,v.z *= 0.91 (bkz. minecraft.wiki/w/Entity).
+     * Yerçekiminden tamamen bağımsız, sabit bir değer.
+     */
+    private static final double VANILLA_HORIZONTAL_DRAG = 0.91;
+
     private PlanetGravityHandler() {
     }
 
@@ -54,8 +61,20 @@ public final class PlanetGravityHandler {
                 // Vanilla bu tick zaten ~VANILLA_GRAVITY kadar düşürdü, farkı telafi ediyoruz
                 double correction = (1.0 - gravityFactor) * VANILLA_GRAVITY;
 
+                // Yatay sürtünmeyi de g ile yumuşatıyoruz. Sebep: vanilla'nın 0.91 sürtünmesi
+                // yerçekiminden bağımsız olduğu için, sadece dikey ivmeyi telafi edersek düşük
+                // g'de havada kalış süresi çok uzasa da yatay hız birkaç tick içinde (geometrik
+                // seri ile) sıfıra yakınsıyor - "planör menzili" sadece kalkış hızına bağlı kalıyor,
+                // havada kalma süresine değil, ve zıplama yüksekliği artsa da ileri mesafe hep aynı
+                // hissettiriyor. Etkin sürtünmeyi effectiveDrag = 1 - g*(1-0.91) olacak şekilde
+                // hesaplıyoruz: g=1'de vanilla ile birebir aynı (çarpan=1), g→0'da sürtünme neredeyse
+                // tamamen kayboluyor (uzayda kayma hissi), böylece uzayan havada kalış süresi artık
+                // gerçekten ekstra ileri mesafeye dönüşüyor.
+                double effectiveDrag = 1.0 - gravityFactor * (1.0 - VANILLA_HORIZONTAL_DRAG);
+                double horizontalMultiplier = effectiveDrag / VANILLA_HORIZONTAL_DRAG;
+
                 Vec3d v = player.getVelocity();
-                player.setVelocity(v.x, v.y + correction, v.z);
+                player.setVelocity(v.x * horizontalMultiplier, v.y + correction, v.z * horizontalMultiplier);
                 player.velocityModified = true;
             }
         });

@@ -5,6 +5,7 @@ import net.minecraft.entity.LivingEntity;
 import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.Vec3d;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
@@ -21,6 +22,24 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 public abstract class LivingEntityMixin {
 
     /**
+     * LivingEntity'nin kendi WASD girdisi (yaw'a göre henüz döndürülmemiş, ham
+     * sideways/forward değerleri). Mixin sınıfları hedef sınıfın field'larına
+     * doğrudan erişemediği için @Shadow ile bildirmemiz gerekiyor.
+     */
+    @Shadow
+    public float sidewaysSpeed;
+
+    @Shadow
+    public float forwardSpeed;
+
+    /**
+     * Zıplama anında yöne doğru eklenen ekstra itişin taban büyüklüğü (vanilla'nın kendi
+     * sprint-zıplama itişiyle aynı mertebede - bkz. LivingEntity#jump, 0.2 sin/cos(yaw)).
+     * gst$scaleJumpForGravity içinde gravityScale ile çarpılarak asıl itiş elde edilir.
+     */
+    private static final double JUMP_DIRECTION_PUSH = 0.5;
+
+    /**
      * jumpPower = 0.42 * sqrt(g_vanilla / g_yerel)
      *
      * Düşük g'de havada kalma süresi ~1/g, menzil de ~1/g ile arttığından,
@@ -28,6 +47,16 @@ public abstract class LivingEntityMixin {
      * ölçeklenmeli. jump() vanilla dikey hızı zaten setVelocity ile atadıktan
      * SONRA (TAIL) devreye giriyoruz, böylece jump boost efekti gibi diğer
      * katkılar da (tutarlı biçimde) toplam hıza dahil olmuş oluyor.
+     *
+     * OYUN HİSSİ İTİŞİ: Oyuncu zıplama anında bir yöne hareket etmeye çalışıyorsa
+     * (sidewaysSpeed/forwardSpeed - yani WASD basılıysa), o yönde ekstra bir itiş
+     * ekliyoruz. Bu vanilla'nın sprint-zıplama itişiyle aynı ruhta (bkz. LivingEntity#jump
+     * içindeki 0.2*sin/cos(yaw) itişi) ama TÜM yönlere (sadece ileri değil, WASD'ın
+     * bileşkesine) çalışıyor ve dikey ölçeklemeyle AYNI "scale" faktörüyle büyüyüp
+     * küçülüyor: g=1'de scale=1 olduğundan itiş sıfır (vanilla'ya dokunulmuyor), düşük
+     * g'de scale büyüdükçe itiş de büyüyor (Ay'da atılan bir adımın çok daha ileriye
+     * gitmesi gibi), yüksek g'de scale 1'in altına düştüğü için itiş sıfırda kalıyor
+     * (negatife/geriye itiş yapmıyoruz - sadece sönümleniyor).
      */
     @Inject(method = "jump", at = @At("TAIL"))
     private void gst$scaleJumpForGravity(CallbackInfo ci) {
@@ -44,7 +73,31 @@ public abstract class LivingEntityMixin {
         }
 
         double scale = Math.sqrt(1.0 / factor);
-        self.setVelocity(velocity.x, velocity.y * scale, velocity.z);
+        double newY = velocity.y * scale;
+
+        double sideways = this.sidewaysSpeed;
+        double forward = this.forwardSpeed;
+        double inputMagSq = sideways * sideways + forward * forward;
+
+        double newX = velocity.x;
+        double newZ = velocity.z;
+        if (inputMagSq > 1.0E-7) {
+            // Vanilla'nın kendi movementInputToVelocity'siyle aynı dönüşüm: (sideways,forward)
+            // çiftini normalize edip yaw'a göre dünya eksenine çeviriyoruz.
+            double invLen = inputMagSq > 1.0 ? 1.0 / Math.sqrt(inputMagSq) : 1.0;
+            double s = sideways * invLen;
+            double f = forward * invLen;
+            float sin = MathHelper.sin(self.getYaw() * ((float) Math.PI / 180.0F));
+            float cos = MathHelper.cos(self.getYaw() * ((float) Math.PI / 180.0F));
+            double dirX = s * cos - f * sin;
+            double dirZ = f * cos + s * sin;
+
+            double push = JUMP_DIRECTION_PUSH * Math.max(0.0, scale - 1.0);
+            newX += dirX * push;
+            newZ += dirZ * push;
+        }
+
+        self.setVelocity(newX, newY, newZ);
         self.velocityModified = true;
     }
 
