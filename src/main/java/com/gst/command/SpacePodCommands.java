@@ -4,6 +4,7 @@ import com.gst.entity.ModEntities;
 import com.gst.world.PlanetDimensions;
 import com.gst.world.UniverseSeedManager;
 import com.gst.world.planet.PlanetGridManager;
+import com.gst.world.planet.PlanetVisitHistory;
 import com.gst.world.star.PlanetApproachHandler;
 import com.mojang.brigadier.CommandDispatcher;
 import net.minecraft.command.CommandRegistryAccess;
@@ -54,12 +55,17 @@ public final class SpacePodCommands {
                                         long universeSeed = UniverseSeedManager.getUniverseSeed();
                                         long worldTime = player.getServerWorld().getTime();
 
-                                        PlanetApproachHandler.NearestPlanet nearest = PlanetApproachHandler.findNearest(
-                                                universeSeed, player.getX(), player.getY(), player.getZ(), worldTime
+                                        PlanetApproachHandler.NearestPlanet nearest = PlanetApproachHandler.findNearestExcluding(
+                                                universeSeed, player.getX(), player.getY(), player.getZ(), worldTime,
+                                                cellKey -> PlanetVisitHistory.isRecentlyVisited(player.getUuid(), cellKey)
                                         );
 
                                         if (nearest == null) {
-                                            source.sendError(Text.literal("Yakin sektorlerde hic gezegen bulunamadi. Baska bir konumdan dene."));
+                                            source.sendError(Text.literal(
+                                                    "Yakin sektorlerde henuz gitmedigin yeni bir gezegen bulunamadi. "
+                                                            + "Son " + PlanetVisitHistory.HISTORY_SIZE + " gezegene tekrar isinlanamazsin - "
+                                                            + "baska bir konumdan (ya da biraz bekleyip) tekrar dene."
+                                            ));
                                             return 0;
                                         }
 
@@ -77,6 +83,8 @@ public final class SpacePodCommands {
                                         double targetY = 900.0;
 
                                         player.teleport(planetsWorld, targetX, targetY, targetZ, player.getYaw(), player.getPitch());
+
+                                        PlanetVisitHistory.recordVisit(player.getUuid(), PlanetGridManager.packCell(cellX, cellZ));
 
                                         String planetName = com.gst.world.star.PlanetNaming.getPlanetName(nearest.system(), nearest.orbit());
                                         com.gst.world.PlanetEntryServerHandler.sendPlanetName(player, planetName);

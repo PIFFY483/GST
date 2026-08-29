@@ -11,6 +11,12 @@ import net.minecraft.util.math.Vec3d;
  * uygular. Vanilla'nın yerçekimini tamamen değiştirmiyoruz (bu, LivingEntity#travel
  * içine mixin gerektirirdi, riskli) - bunun yerine vanilla uyguladıktan SONRA
  * farkı telafi ediyoruz. Tam fizik doğruluğu değil ama hissedilir bir fark yaratır.
+ *
+ * ARŞİMET NOTU: Oyuncu suda/lavdayken bu düzeltmeyi UYGULAMIYORUZ. Kaldırma
+ * kuvveti F = ρ·V·g ve ağırlık m·g olduğundan, batma/yüzme oranı g'den
+ * bağımsızdır (g'ler sadeleşir) - vanilla'nın sıvı fiziği zaten bunu doğru
+ * yapıyor. Buraya ekstra bir düzeltme eklemek, düşük/yüksek g gezegenlerinde
+ * batma hızını yanlış şekilde değiştirirdi.
  */
 public final class PlanetGravityHandler {
 
@@ -33,6 +39,9 @@ public final class PlanetGravityHandler {
                 }
                 if (player.isOnGround() || player.getAbilities().flying) {
                     continue;
+                }
+                if (player.isTouchingWater() || player.isInLava()) {
+                    continue; // Arşimet: kaldırma kuvveti g'den bağımsız, yukarıdaki nota bak
                 }
 
                 PlanetData data = PlanetGridManager.getPlanetAt(universeSeed, player.getBlockX(), player.getBlockZ());
