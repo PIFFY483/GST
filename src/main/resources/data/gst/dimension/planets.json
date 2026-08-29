@@ -1,0 +1,10 @@
+{
+  "type": "gst:planets_type",
+  "generator": {
+    "type": "gst:planet_generator",
+    "biome_source": {
+      "type": "minecraft:fixed",
+      "biome": "minecraft:the_void"
+    }
+  }
+}

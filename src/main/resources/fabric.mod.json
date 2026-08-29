@@ -1,0 +1,36 @@
+{
+	"schemaVersion": 1,
+	"id": "gst",
+	"version": "${version}",
+	"name": "Galactic Space Travel",
+	"description": "Overworld ile uzay arasinda kesintisiz gecis saglayan ve procedural olarak uretilen galaksi olcekli bir uzay sistemi ekler.",
+	"authors": [
+		"Nihao"
+	],
+	"contact": {
+	},
+	"license": "CC0-1.0",
+	"icon": "assets/gst/icon.png",
+	"environment": "*",
+	"entrypoints": {
+		"main": [
+			"com.gst.GalacticSpaceTravel"
+		],
+		"client": [
+			"com.gst.client.GalacticSpaceTravelClient"
+		]
+	},
+	"mixins": [
+		"gst.mixins.json",
+		{
+			"config": "gst.client.mixins.json",
+			"environment": "client"
+		}
+	],
+	"depends": {
+		"fabricloader": ">=0.19.3",
+		"minecraft": "~1.20.1",
+		"java": ">=17",
+		"fabric-api": "*"
+	}
+}
